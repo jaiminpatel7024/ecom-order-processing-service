@@ -8,11 +8,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class AppConfig {
 
 
-    @Bean(name = "auth-service-validate")
-    public WebClient webClientAuthService(WebClient.Builder webClientBuilder)
+    @Bean(name = "inventory-service-web-client")
+    public WebClient webClientInventoryService(WebClient.Builder webClientBuilder)
     {
         return webClientBuilder
-                .baseUrl("http://localhost:8085/api/v1/validate")
+                .baseUrl("http://localhost:8083/api/v1")
                 .filter(new LoggingWebClientFilter())
                 .build();
     }
@@ -26,11 +26,11 @@ public class AppConfig {
                 .build();
     }
 
-    @Bean(name = "plain-old-web-client")
-    public WebClient webClientSubService(WebClient.Builder webClientBuilder)
+    @Bean(name = "payment-service-web-client")
+    public WebClient webClientPaymentService(WebClient.Builder webClientBuilder)
     {
         return webClientBuilder
-                .baseUrl("http://localhost:8101/api/v1")
+                .baseUrl("http://localhost:8105/api/v1")
                 .filter(new LoggingWebClientFilter())
                 .build();
     }

@@ -10,27 +10,27 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.core.publisher.Mono;
 
 @Service
-public class CustomerService
+public class InventoryService
 {
-    private static final Logger log = LoggerFactory.getLogger(CustomerService.class);
+    private static final Logger log = LoggerFactory.getLogger(InventoryService.class);
 
 
     @Autowired
-    @Qualifier("customer-service-web-client")
+    @Qualifier("inventory-service-web-client")
     WebClient webClient;
 
-    public boolean validateToken(String token) {
+    public boolean checkStockAvailibility(String token, Order orderObj){
 
-        log.info("Validating token within the CustomerService: {}", token);
-        log.info("Sending request to customer service to validate token: {}", token);
-        /*String response = webClient.get().uri("/validate")
-                .header("Authorization", token)
-                .retrieve()
-                .bodyToMono(String.class).block(); // Current Thread will pause till the final response comes back*/
+        log.info("Validating stock availibility using inventory service.");
+
+        //Create temp Inventory Object
+        Inventory inventory = new Inventory();
+        inventory.setProductId(orderObj.getProductId());
+        inventory.setQuantities(orderObj.getQuantities());
 
         try {
             String response = webClient.get()
-                    .uri("/validate")
+                    .uri("/inventory/block")
                     .header("Authorization", token)
                     .retrieve()
                     .onStatus(status -> status.value() == 401, responseTemp ->
@@ -48,6 +48,5 @@ public class CustomerService
             }
             throw e;
         }
-
     }
 }

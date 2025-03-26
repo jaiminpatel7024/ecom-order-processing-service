@@ -22,8 +22,8 @@ public class Order {
     private Long orderTotal;
     private String username;
     private LocalDateTime orderTime;
-    private String status;
-    private String paymentStatus;
+    private String status; //PROCESSING, FAILED, SHIPPED, CANCELLED
+    private String paymentStatus; //PENDING, UNPAID, PAID
 
     @Override
     public String toString() {
