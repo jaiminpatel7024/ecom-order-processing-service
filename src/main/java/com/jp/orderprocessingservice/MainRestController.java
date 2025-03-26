@@ -72,10 +72,10 @@ public class MainRestController {
             inventory.setQuantities(newOrder.getQuantities());
 
             try {
-                String inventoryResponse = inventoryWebClient.get()
-                        .uri(uriBuilder ->  uriBuilder.path("/inventory/block")
-                                .build(inventory))
+                String inventoryResponse = inventoryWebClient.post()
+                        .uri("/inventory/block")
                         .header("Authorization", token)
+                        .bodyValue(inventory)
                         .retrieve()
                         .onStatus(status -> status.value() == 401, responseTemp ->
                                 Mono.error(new WebClientResponseException("Unauthorized", 401, "Unauthorized", null, null, null)))
@@ -92,7 +92,7 @@ public class MainRestController {
                     return ResponseEntity.ok("Failed to process order "+newOrder.getOrderId()+" because of insufficient quantity.");
                 }else{
                     //If sufficient than initiate a transaction with payment service
-                    String paymentResponse = paymentWebClient.get()
+                    String paymentResponse = paymentWebClient.post()
                             .uri(uriBuilder ->  uriBuilder.path("/payment/create/"+orderId).build())
                             .header("Authorization", token)
                             .retrieve()

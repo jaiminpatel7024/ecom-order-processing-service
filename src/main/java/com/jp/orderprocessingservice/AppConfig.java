@@ -12,7 +12,7 @@ public class AppConfig {
     public WebClient webClientInventoryService(WebClient.Builder webClientBuilder)
     {
         return webClientBuilder
-                .baseUrl("http://localhost:8083/api/v1")
+                .baseUrl("http://localhost:8103/api/v1")
                 .filter(new LoggingWebClientFilter())
                 .build();
     }
