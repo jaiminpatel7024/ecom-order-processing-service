@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.jp</groupId>
-    <artifactId>product-catalog-service</artifactId>
+    <artifactId>order-processing-service</artifactId>
     <version>1.0</version>
-    <name>ECom Product Catalog Service</name>
-    <description>ECom Product Catalog Service</description>
+    <name>ECom Order Processing Service</name>
+    <description>ECom Order Processing Service</description>
     <url/>
     <licenses>
         <license/>

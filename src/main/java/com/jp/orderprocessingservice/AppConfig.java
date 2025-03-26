@@ -1,4 +1,4 @@
-package com.jp.productcatalogservice;
+package com.jp.orderprocessingservice;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
