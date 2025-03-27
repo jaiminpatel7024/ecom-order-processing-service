@@ -42,6 +42,9 @@ public class MainRestController1 {
     @Autowired
     RedisTemplate<String, Object> redisTemplate;
 
+    @Autowired
+    PaymentService paymentService;
+
     private static final Logger log = LoggerFactory.getLogger(MainRestController1.class);
 
     @GetMapping("/test")
@@ -114,9 +117,10 @@ public class MainRestController1 {
                             } else {
                                 log.info("Sufficient quantity of products available for order : {}, proceeding further with payment creation.",orderId);
                                 redisTemplate.opsForValue().set(responseKey,"Order-Service-Stage:QuantityCheckStage:Available:"+orderId);
-
+                                newOrder.setStatus("QuantityAvailable");
+                                orderRepo.save(newOrder);
                                 //Move further with payment creation and updates
-
+                                paymentService.processPayment(token,orderId,newOrder, responseKey);
                             }
                             // MENU CREATION LOGIC TO BE IMPLEMENTED HERE
                             // AND PUT THE RESPONSE IN REDIS
@@ -150,18 +154,25 @@ public class MainRestController1 {
                     String responseKey = tempCookie.get().getValue();
                     String updatedResponse = redisTemplate.opsForValue().get(responseKey).toString();
                     log.info("Updated response stored is : "+updatedResponse);
-                    String orderId = updatedResponse.split(":")[2];
+                    String orderId = updatedResponse.split(":")[3];
 
                     if(updatedResponse.startsWith("Order-Service-Stage:QuantityCheckStage:InsufficientQuantity")){
-                        return ResponseEntity.ok("Failed to process order "+orderId+" because of insufficient quantity.");
+                        return ResponseEntity.ok("Order Id : "+orderId+" : Failed to process order because of insufficient quantity.");
                     } else if(updatedResponse.startsWith("Order-Service-Stage:QuantityCheckStage:Available")){
-                        return ResponseEntity.ok("Order Processing in progress. Quantity Check completed successfully. Proceeding with payment creation.");
+                        return ResponseEntity.ok("Order Id : "+orderId+" : Order Processing in progress. Quantity Check completed successfully. Proceeding with payment creation.");
+                    } else if(updatedResponse.startsWith("Order-Service-Stage:PaymentStage:PaymentSuccessful")){
+                        return ResponseEntity.ok("Order Id : "+orderId+" : Order Payment successful. Order ready to ship.");
+                    } else if (updatedResponse.startsWith("Order-Service-Stage:PaymentStage:PaymentFailed")){
+                        return ResponseEntity.ok("Order Id : "+orderId+" : Order Payment failed.");
+                    }else if (updatedResponse.startsWith("Order-Service-Stage:PaymentStage:PaymentError")){
+                        return ResponseEntity.ok("Order Id : "+orderId+" : Error processing order payment. Try to place new order");
                     }
 
                     return ResponseEntity.ok(updatedResponse);
 
                 }else{
-                    return ResponseEntity.ok("temp response");
+                    //False Alarm. Need to update it later to make them work.
+                    return ResponseEntity.ok("Cookies not found. Enable cookies in browser");
                 }
             }
         } else {
