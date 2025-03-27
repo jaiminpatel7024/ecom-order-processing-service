@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -24,7 +23,7 @@ public class PaymentService {
     @Autowired
     OrderRepository orderRepo;
 
-    private static final Logger log = LoggerFactory.getLogger(MainRestController1.class);
+    private static final Logger log = LoggerFactory.getLogger(MainRestControllerAsync.class);
 
 
     public void processPayment(String token, String orderId, Order newOrder, String responseKey){

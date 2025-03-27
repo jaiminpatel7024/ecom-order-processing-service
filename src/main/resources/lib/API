@@ -1,0 +1,12 @@
+GET localhost:8204/api/v2/orders/viewAll
+---
+POST localhost:8204/api/v2/orders/new
+{
+	"username":"jp123",
+	"productId":"1",
+	"quantities":"5",
+	"orderTotal":"10"
+}
+---
+GET localhost:8204/api/v2/orders/view/67216
+---
