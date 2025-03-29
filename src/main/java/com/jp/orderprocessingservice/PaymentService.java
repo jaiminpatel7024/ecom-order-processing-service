@@ -27,7 +27,7 @@ public class PaymentService {
     OrderRepository orderRepo;
 
     @Autowired
-    Producer eventProducer;
+    EventProducer eventProducer;
 
     private static final Logger log = LoggerFactory.getLogger(MainRestControllerAsync.class);
 

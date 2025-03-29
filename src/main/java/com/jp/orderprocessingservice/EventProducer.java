@@ -11,9 +11,9 @@ import org.springframework.stereotype.Service;
 import java.util.concurrent.ExecutionException;
 
 @Service
-public class Producer
+public class EventProducer
 {
-    private static final Logger logger = LoggerFactory.getLogger(Producer.class);
+    private static final Logger logger = LoggerFactory.getLogger(EventProducer.class);
     private static final String TOPIC = "order-events";
 
     @Autowired
@@ -22,7 +22,7 @@ public class Producer
 
     public void publishOrderData(String orderId, String username, String orderStatus, String paymentStatus, String type, String description) throws JsonProcessingException, ExecutionException, InterruptedException {
 
-       OrderData orderData = new OrderData();
+       OrderEvent orderData = new OrderEvent();
        orderData.setOrderId(orderId);
        orderData.setUsername(username);
        orderData.setOrderStatus(orderStatus);
@@ -30,7 +30,6 @@ public class Producer
        orderData.setEventType(type);
        orderData.setDescription(description);
 
-       System.out.println("Trying to produce the kafka data.");
         logger.info("created the order message object: {}",orderData);
         // convert to JSON
         ObjectMapper objectMapper = new ObjectMapper();

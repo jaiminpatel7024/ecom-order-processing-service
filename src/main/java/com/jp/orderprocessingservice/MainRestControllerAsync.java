@@ -1,7 +1,6 @@
 package com.jp.orderprocessingservice;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.netflix.discovery.converters.Auto;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -47,7 +46,7 @@ public class MainRestControllerAsync {
     PaymentService paymentService;
 
     @Autowired
-    Producer eventProducer;
+    EventProducer eventProducer;
 
     private static final Logger log = LoggerFactory.getLogger(MainRestControllerAsync.class);
 
@@ -79,7 +78,6 @@ public class MainRestControllerAsync {
                 newOrder.setStatus("NEW");
                 newOrder.setUsername(orderRequest.getUsername());
 
-                System.out.println("Trying to produce the kafka data from main controller.");
                 orderRepo.save(newOrder);
                 String orderId = newOrder.getOrderId();
                 log.info("New order is placed and is pending with order id : "+orderId);
