@@ -1,5 +1,7 @@
 package com.jp.orderprocessingservice;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.netflix.discovery.converters.Auto;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequestMapping("/api/v2")
@@ -43,6 +46,9 @@ public class MainRestControllerAsync {
     @Autowired
     PaymentService paymentService;
 
+    @Autowired
+    Producer eventProducer;
+
     private static final Logger log = LoggerFactory.getLogger(MainRestControllerAsync.class);
 
     @GetMapping("/test")
@@ -53,7 +59,7 @@ public class MainRestControllerAsync {
 
     @PostMapping("/orders/new")
     public ResponseEntity<?> placeNewOrder(@RequestHeader("Authorization") String token, @RequestBody Order orderRequest, HttpServletRequest request,
-                                           HttpServletResponse response){
+                                           HttpServletResponse response) throws JsonProcessingException, ExecutionException, InterruptedException {
 
         log.info("Received request to place new order : {}", orderRequest);
 
@@ -70,12 +76,14 @@ public class MainRestControllerAsync {
                 newOrder.setPaymentStatus("PENDING");
                 newOrder.setProductId(orderRequest.getProductId());
                 newOrder.setQuantities(orderRequest.getQuantities());
-                newOrder.setStatus("PROCESSING");
+                newOrder.setStatus("NEW");
                 newOrder.setUsername(orderRequest.getUsername());
 
+                System.out.println("Trying to produce the kafka data from main controller.");
                 orderRepo.save(newOrder);
                 String orderId = newOrder.getOrderId();
                 log.info("New order is placed and is pending with order id : "+orderId);
+                eventProducer.publishOrderData(orderId,newOrder.getUsername(), newOrder.getStatus(),newOrder.getPaymentStatus(),"CREATE","New Order Received.");
 
 
                 //If token is valid, check with Inventory service for available stock
@@ -100,6 +108,10 @@ public class MainRestControllerAsync {
                 log.info("Response Key: {}", responseKey);
                 redisTemplate.opsForValue().set(responseKey,"Order-Service-Stage:OrderPlaced:"+orderId);
 
+                newOrder.setStatus("PROCESSING");
+                orderRepo.save(newOrder);
+                eventProducer.publishOrderData(orderId,newOrder.getUsername(), newOrder.getStatus(),newOrder.getPaymentStatus(),"UPDATE","Processing. Stock validation in progress.");
+
                 inventoryAsyncResponse.subscribe((tempResponse) ->
                         {
                             log.info(tempResponse+" from the inventory service in async call");
@@ -109,6 +121,15 @@ public class MainRestControllerAsync {
                                     log.info("Order can not be processed as having insufficient quantities for order id : "+newOrder.getOrderId());
                                     newOrder.setStatus("FAILED");
                                     orderRepo.save(newOrder);
+                                    try {
+                                        eventProducer.publishOrderData(orderId,newOrder.getUsername(), newOrder.getStatus(),newOrder.getPaymentStatus(),"UPDATE","Order quantity insufficient.");
+                                    } catch (JsonProcessingException e) {
+                                        e.printStackTrace();
+                                        log.error("Error updating the events in Kafka Producer", e);
+                                    } catch (ExecutionException | InterruptedException e) {
+                                        throw new RuntimeException(e);
+                                    }
+
                                     redisTemplate.opsForValue().set(responseKey,"Order-Service-Stage:QuantityCheckStage:InsufficientQuantity:"+orderId);
                                     //return ResponseEntity.ok("Failed to process order "+newOrder.getOrderId()+" because of insufficient quantity.");
                                 }
@@ -117,18 +138,15 @@ public class MainRestControllerAsync {
                                 redisTemplate.opsForValue().set(responseKey,"Order-Service-Stage:QuantityCheckStage:Available:"+orderId);
                                 newOrder.setStatus("QuantityAvailable");
                                 orderRepo.save(newOrder);
+                                try {
+                                    eventProducer.publishOrderData(orderId,newOrder.getUsername(), newOrder.getStatus(),newOrder.getPaymentStatus(),"UPDATE","Order quantity available.");
+                                } catch (JsonProcessingException | ExecutionException | InterruptedException e) {
+                                    log.error("Error updating the events in Kafka Producer", e);
+                                }
+
                                 //Move further with payment creation and updates
                                 paymentService.processPayment(token,orderId,newOrder, responseKey);
                             }
-                            // MENU CREATION LOGIC TO BE IMPLEMENTED HERE
-                            // AND PUT THE RESPONSE IN REDIS
-                        /*try {
-                            producer.publishSubDatum(subscription.getSubid(), "subscription created payment created", "UPDATE", "UNPAID");
-                        } catch (JsonProcessingException e) {
-                            throw new RuntimeException(e);
-                        }*/
-
-                            // redisTemplate.opsForValue().set(responseKey,"payresponse "+response);
                         },
                         error ->
                         {
@@ -136,8 +154,12 @@ public class MainRestControllerAsync {
                             log.info("Order can not be processed as error occurred for order id : "+newOrder.getOrderId());
                             newOrder.setStatus("FAILED");
                             orderRepo.save(newOrder);
+                            try {
+                                eventProducer.publishOrderData(orderId,newOrder.getUsername(), newOrder.getStatus(),newOrder.getPaymentStatus(),"ERROR","Error processing order quantities.");
+                            } catch (JsonProcessingException | ExecutionException | InterruptedException e) {
+                                log.error("Error updating the events in Kafka Producer", e);
+                            }
                             redisTemplate.opsForValue().set(responseKey,"Order-Service-Stage:QuantityCheckStage:QuantityCheckError:"+orderId);
-                            //redisTemplate.opsForValue().set(responseKey,"error "+error.getMessage());
                         });
 
                 //Get the cookies and update the intrim response.

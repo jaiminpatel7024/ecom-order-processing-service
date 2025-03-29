@@ -1,5 +1,6 @@
 package com.jp.orderprocessingservice;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
+
+import java.util.concurrent.ExecutionException;
 
 @Service
 public class PaymentService {
@@ -22,6 +25,9 @@ public class PaymentService {
 
     @Autowired
     OrderRepository orderRepo;
+
+    @Autowired
+    Producer eventProducer;
 
     private static final Logger log = LoggerFactory.getLogger(MainRestControllerAsync.class);
 
@@ -37,6 +43,16 @@ public class PaymentService {
                         Mono.error(new WebClientResponseException("Unauthorized", 401, "Unauthorized", null, null, null)))
                 .bodyToMono(String.class);
 
+        newOrder.setStatus("PAYMENT_PROCESSING");
+        newOrder.setPaymentStatus("PROCESSING");
+        orderRepo.save(newOrder);
+
+        try {
+            eventProducer.publishOrderData(orderId,newOrder.getUsername(), newOrder.getStatus(),newOrder.getPaymentStatus(),"UPDATE","Payment Processing In Progress.");
+        } catch (JsonProcessingException | ExecutionException | InterruptedException e) {
+            log.error("Error updating the events in Kafka Producer", e);
+        }
+
         paymentResponse.subscribe((response) -> {
                 log.info(response+" from the payment service in async call");
                 if(response.startsWith("PaymentID")){
@@ -46,33 +62,38 @@ public class PaymentService {
                         newOrder.setPaymentStatus("PAID");
                         newOrder.setStatus("SHIPPED");
                         orderRepo.save(newOrder);
+                        try {
+                            eventProducer.publishOrderData(orderId,newOrder.getUsername(), newOrder.getStatus(),newOrder.getPaymentStatus(),"COMPLETE","Payment Successful. Order Complete.");
+                        } catch (JsonProcessingException | ExecutionException | InterruptedException e) {
+                            log.error("Error updating the events in Kafka Producer", e);
+                        }
                         redisTemplate.opsForValue().set(responseKey,"Order-Service-Stage:PaymentStage:PaymentSuccessful:"+orderId);
-                        //return ResponseEntity.ok("Payment processed successfully for order : "+orderId+". Order ready to be Shipped.");
                     }
                 } else {
                     log.info("Payment processing failed for order id : {}.",orderId);
                     redisTemplate.opsForValue().set(responseKey,"Order-Service-Stage:PaymentStage:PaymentFailed:"+orderId);
                     newOrder.setStatus("FAILED");
+                    newOrder.setPaymentStatus("PAYMENT_FAILED");
                     orderRepo.save(newOrder);
-                    //return ResponseEntity.ok("Failed to process order "+newOrder.getOrderId()+" because of payment failure.");
+                    try {
+                        eventProducer.publishOrderData(orderId,newOrder.getUsername(), newOrder.getStatus(),newOrder.getPaymentStatus(),"COMPLETE","Payment Failed. Order Complete.");
+                    } catch (JsonProcessingException | ExecutionException | InterruptedException e) {
+                        log.error("Error updating the events in Kafka Producer", e);
+                    }
                 }
-                // MENU CREATION LOGIC TO BE IMPLEMENTED HERE
-                // AND PUT THE RESPONSE IN REDIS
-                        /*try {
-                            producer.publishSubDatum(subscription.getSubid(), "subscription created payment created", "UPDATE", "UNPAID");
-                        } catch (JsonProcessingException e) {
-                            throw new RuntimeException(e);
-                        }*/
-
-                // redisTemplate.opsForValue().set(responseKey,"payresponse "+response);
             },
             error ->
             {
                 log.info("error processing the response "+error.getMessage());
                 redisTemplate.opsForValue().set(responseKey,"Order-Service-Stage:PaymentStage:PaymentError:"+orderId);
                 newOrder.setStatus("FAILED");
+                newOrder.setPaymentStatus("PAYMENT_FAILED");
                 orderRepo.save(newOrder);
-                //redisTemplate.opsForValue().set(responseKey,"error "+error.getMessage());
+                try {
+                    eventProducer.publishOrderData(orderId,newOrder.getUsername(), newOrder.getStatus(),newOrder.getPaymentStatus(),"ERROR","Error processing payment.");
+                } catch (JsonProcessingException | ExecutionException | InterruptedException e) {
+                    log.error("Error updating the events in Kafka Producer", e);
+                }
             });
     }
 
